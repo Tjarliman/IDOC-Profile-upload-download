@@ -19,6 +19,7 @@ TABLES: edp13.
 * Type Definitions
 *----------------------------------------------------------------------*
 TYPES:
+  ty_t_edpp1 TYPE STANDARD TABLE OF edpp1 WITH DEFAULT KEY,
   ty_t_edp13 TYPE STANDARD TABLE OF edp13 WITH DEFAULT KEY,
   ty_t_edp12 TYPE STANDARD TABLE OF edp12 WITH DEFAULT KEY.
 
@@ -28,6 +29,7 @@ TYPES: BEGIN OF ty_export,
          expdate TYPE d,
          exptime TYPE t,
          expuser TYPE c LENGTH 12,
+         edpp1   TYPE ty_t_edpp1,
          edp13   TYPE ty_t_edp13,
          edp12   TYPE ty_t_edp12,
        END OF ty_export.
@@ -167,6 +169,7 @@ ENDFORM.
 *&---------------------------------------------------------------------*
 FORM download.
   DATA: ls_export  TYPE ty_export,
+        lt_edpp1   TYPE ty_t_edpp1,
         lt_edp13   TYPE ty_t_edp13,
         lt_edp12   TYPE ty_t_edp12,
         lt_pkeys   TYPE ty_t_pkeys,
@@ -196,12 +199,19 @@ FORM download.
     RETURN.
   ENDIF.
 
+  " Select partner profile headers
+  SELECT * FROM edpp1
+    INTO TABLE lt_edpp1
+    WHERE rcvprn IN s_rcvprn
+      AND rcvprt IN s_rcvprt.
+
   " Build export structure
   ls_export-sysid   = sy-sysid.
   ls_export-client  = sy-mandt.
   ls_export-expdate = sy-datum.
   ls_export-exptime = sy-uzeit.
   ls_export-expuser = sy-uname.
+  ls_export-edpp1   = lt_edpp1.
   ls_export-edp13   = lt_edp13.
   ls_export-edp12   = lt_edp12.
 
@@ -254,6 +264,7 @@ FORM download.
   ULINE.
   WRITE: / 'System / Client:',  15 sy-sysid, '/', sy-mandt.
   WRITE: / 'Partners:',         15 lines( lt_pkeys ).
+  WRITE: / 'Headers  (EDPP1):', 15 lines( lt_edpp1 ).
   WRITE: / 'Outbound (EDP13):', 15 lines( lt_edp13 ).
   WRITE: / 'Inbound  (EDP12):', 15 lines( lt_edp12 ).
   SKIP.
@@ -333,6 +344,9 @@ FORM upload.
   ENDTRY.
 
   " 4. Adjust client to current system
+  LOOP AT ls_import-edpp1 ASSIGNING FIELD-SYMBOL(<h>).
+    <h>-mandt = sy-mandt.
+  ENDLOOP.
   LOOP AT ls_import-edp13 ASSIGNING FIELD-SYMBOL(<o>).
     <o>-mandt = sy-mandt.
   ENDLOOP.
@@ -360,6 +374,7 @@ FORM upload.
   WRITE: / 'Exported:',              ls_import-expdate, ls_import-exptime,
            'by', ls_import-expuser.
   WRITE: / 'Partners:',         15 lines( lt_pkeys ).
+  WRITE: / 'Headers  (EDPP1):', 15 lines( ls_import-edpp1 ).
   WRITE: / 'Outbound (EDP13):', 15 lines( ls_import-edp13 ).
   WRITE: / 'Inbound  (EDP12):', 15 lines( ls_import-edp12 ).
   SKIP.
@@ -414,6 +429,8 @@ FORM upload.
   " 9. Replace mode: delete existing entries for affected partners
   IF p_repl = abap_true.
     LOOP AT lt_pkeys INTO ls_pkey.
+      DELETE FROM edpp1
+        WHERE rcvprn = ls_pkey-rcvprn AND rcvprt = ls_pkey-rcvprt.
       DELETE FROM edp13
         WHERE rcvprn = ls_pkey-rcvprn AND rcvprt = ls_pkey-rcvprt.
       DELETE FROM edp12
@@ -422,7 +439,17 @@ FORM upload.
     WRITE: / 'Existing entries deleted for affected partners (Replace mode).' COLOR COL_TOTAL.
   ENDIF.
 
-  " 10. Import outbound parameters
+  " 10. Import partner profile headers
+  IF ls_import-edpp1 IS NOT INITIAL.
+    MODIFY edpp1 FROM TABLE ls_import-edpp1.
+    IF sy-subrc = 0.
+      WRITE: / 'Headers (EDPP1) imported:' COLOR COL_POSITIVE, lines( ls_import-edpp1 ), 'entries.'.
+    ELSE.
+      WRITE: / 'Error importing partner profile headers.' COLOR COL_NEGATIVE.
+    ENDIF.
+  ENDIF.
+
+  " 12. Import outbound parameters
   IF ls_import-edp13 IS NOT INITIAL.
     MODIFY edp13 FROM TABLE ls_import-edp13.
     IF sy-subrc = 0.
@@ -432,7 +459,7 @@ FORM upload.
     ENDIF.
   ENDIF.
 
-  " 11. Import inbound parameters
+  " 13. Import inbound parameters
   IF ls_import-edp12 IS NOT INITIAL.
     MODIFY edp12 FROM TABLE ls_import-edp12.
     IF sy-subrc = 0.
