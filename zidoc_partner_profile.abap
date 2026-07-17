@@ -5,8 +5,8 @@
 *& Covers headers (EDPP1), outbound (EDP13), inbound (EDP21),
 *& and message control (EDP12) for all partner types.
 *&
-*& Download: Reads profiles matching selection criteria → XML file.
-*& Upload:   Reads XML file → imports profiles into target system.
+*& Download: Reads profiles matching selection criteria -> XML file.
+*& Upload:   Reads XML file -> imports profiles into target system.
 *&
 *& Uses CALL TRANSFORMATION id for reliable round-trip serialization
 *& of all table fields.
@@ -43,14 +43,6 @@ TYPES: BEGIN OF ty_pkey,
        ty_t_pkeys TYPE SORTED TABLE OF ty_pkey WITH UNIQUE KEY rcvprn rcvprt.
 
 *----------------------------------------------------------------------*
-* Screen Title Variables
-*----------------------------------------------------------------------*
-DATA: t_mode   TYPE c LENGTH 40,
-      t_filter TYPE c LENGTH 40,
-      t_file   TYPE c LENGTH 40,
-      t_opt    TYPE c LENGTH 40.
-
-*----------------------------------------------------------------------*
 * Selection Screen
 *----------------------------------------------------------------------*
 SELECTION-SCREEN BEGIN OF BLOCK b0 WITH FRAME TITLE t_mode.
@@ -82,9 +74,9 @@ SELECTION-SCREEN END OF BLOCK b3.
 *----------------------------------------------------------------------*
 INITIALIZATION.
   t_mode   = 'Mode'.
-  t_filter = 'Download Filters'.
+  t_filter = 'Filters'.
   t_file   = 'File'.
-  t_opt    = 'Upload Options'.
+  t_opt    = 'Options'.
 
 *----------------------------------------------------------------------*
 * Toggle field visibility based on mode
@@ -461,7 +453,7 @@ FORM upload.
 
   " 8. Test mode — stop here
   IF p_test = abap_true.
-    WRITE: / 'TEST MODE — no database changes were made.' COLOR COL_TOTAL.
+    WRITE: / 'TEST MODE - no database changes were made.' COLOR COL_TOTAL.
     WRITE: / 'Uncheck "Test Mode" and re-run to apply changes.'.
     RETURN.
   ENDIF.
