@@ -184,10 +184,9 @@ FORM download.
   " Select inbound parameters
   SELECT * FROM edp21
     INTO TABLE lt_edp21
-    WHERE rcvprn IN s_rcvprn
-      AND rcvprt IN s_rcvprt
-      AND mestyp IN s_mestyp
-      AND idoctyp IN s_idoctp.
+    WHERE sndprn IN s_rcvprn
+      AND sndprt IN s_rcvprt
+      AND mestyp IN s_mestyp.
 
   " Select message control (output determination)
   SELECT * FROM edp12
@@ -204,8 +203,8 @@ FORM download.
   " Select partner profile headers
   SELECT * FROM edpp1
     INTO TABLE lt_edpp1
-    WHERE rcvprn IN s_rcvprn
-      AND rcvprt IN s_rcvprt.
+    WHERE parnum IN s_rcvprn
+      AND partyp IN s_rcvprt.
 
   " Build export structure
   ls_export-sysid   = sy-sysid.
@@ -256,8 +255,8 @@ FORM download.
     INSERT ls_pkey INTO TABLE lt_pkeys.
   ENDLOOP.
   LOOP AT lt_edp21 ASSIGNING FIELD-SYMBOL(<i>).
-    ls_pkey-rcvprn = <i>-rcvprn.
-    ls_pkey-rcvprt = <i>-rcvprt.
+    ls_pkey-rcvprn = <i>-sndprn.
+    ls_pkey-rcvprt = <i>-sndprt.
     INSERT ls_pkey INTO TABLE lt_pkeys.
   ENDLOOP.
   LOOP AT lt_edp12 ASSIGNING FIELD-SYMBOL(<m>).
@@ -293,7 +292,7 @@ FORM download.
       lv_out_cnt = lv_out_cnt + 1.
     ENDLOOP.
     LOOP AT lt_edp21 TRANSPORTING NO FIELDS
-      WHERE rcvprn = ls_pkey-rcvprn AND rcvprt = ls_pkey-rcvprt.
+      WHERE sndprn = ls_pkey-rcvprn AND sndprt = ls_pkey-rcvprt.
       lv_in_cnt = lv_in_cnt + 1.
     ENDLOOP.
     LOOP AT lt_edp12 TRANSPORTING NO FIELDS
@@ -379,8 +378,8 @@ FORM upload.
     INSERT ls_pkey INTO TABLE lt_pkeys.
   ENDLOOP.
   LOOP AT ls_import-edp21 ASSIGNING <i>.
-    ls_pkey-rcvprn = <i>-rcvprn.
-    ls_pkey-rcvprt = <i>-rcvprt.
+    ls_pkey-rcvprn = <i>-sndprn.
+    ls_pkey-rcvprt = <i>-sndprt.
     INSERT ls_pkey INTO TABLE lt_pkeys.
   ENDLOOP.
   LOOP AT ls_import-edp12 ASSIGNING <m>.
@@ -420,7 +419,7 @@ FORM upload.
       lv_imp_out = lv_imp_out + 1.
     ENDLOOP.
     LOOP AT ls_import-edp21 TRANSPORTING NO FIELDS
-      WHERE rcvprn = ls_pkey-rcvprn AND rcvprt = ls_pkey-rcvprt.
+      WHERE sndprn = ls_pkey-rcvprn AND sndprt = ls_pkey-rcvprt.
       lv_imp_in = lv_imp_in + 1.
     ENDLOOP.
     LOOP AT ls_import-edp12 TRANSPORTING NO FIELDS
@@ -433,7 +432,7 @@ FORM upload.
       WHERE rcvprn = ls_pkey-rcvprn AND rcvprt = ls_pkey-rcvprt.
     lv_out_cnt = sy-dbcnt.
     SELECT COUNT(*) FROM edp21
-      WHERE rcvprn = ls_pkey-rcvprn AND rcvprt = ls_pkey-rcvprt.
+      WHERE sndprn = ls_pkey-rcvprn AND sndprt = ls_pkey-rcvprt.
     lv_in_cnt = sy-dbcnt.
     SELECT COUNT(*) FROM edp12
       WHERE rcvprn = ls_pkey-rcvprn AND rcvprt = ls_pkey-rcvprt.
@@ -462,11 +461,11 @@ FORM upload.
   IF p_repl = abap_true.
     LOOP AT lt_pkeys INTO ls_pkey.
       DELETE FROM edpp1
-        WHERE rcvprn = ls_pkey-rcvprn AND rcvprt = ls_pkey-rcvprt.
+        WHERE parnum = ls_pkey-rcvprn AND partyp = ls_pkey-rcvprt.
       DELETE FROM edp13
         WHERE rcvprn = ls_pkey-rcvprn AND rcvprt = ls_pkey-rcvprt.
       DELETE FROM edp21
-        WHERE rcvprn = ls_pkey-rcvprn AND rcvprt = ls_pkey-rcvprt.
+        WHERE sndprn = ls_pkey-rcvprn AND sndprt = ls_pkey-rcvprt.
       DELETE FROM edp12
         WHERE rcvprn = ls_pkey-rcvprn AND rcvprt = ls_pkey-rcvprt.
     ENDLOOP.
