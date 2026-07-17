@@ -56,7 +56,7 @@ SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE t_filter.
     s_rcvprn FOR edp13-rcvprn MODIF ID dwn,
     s_rcvprt FOR edp13-rcvprt MODIF ID dwn,
     s_mestyp FOR edp13-mestyp MODIF ID dwn,
-    s_idoctp FOR edp13-idoctp MODIF ID dwn.
+    s_idoctp FOR edp13-idoctyp MODIF ID dwn.
 SELECTION-SCREEN END OF BLOCK b1.
 
 SELECTION-SCREEN BEGIN OF BLOCK b2 WITH FRAME TITLE t_file.
@@ -179,7 +179,7 @@ FORM download.
     WHERE rcvprn IN s_rcvprn
       AND rcvprt IN s_rcvprt
       AND mestyp IN s_mestyp
-      AND idoctp IN s_idoctp.
+      AND idoctyp IN s_idoctp.
 
   " Select inbound parameters
   SELECT * FROM edp21
@@ -187,7 +187,7 @@ FORM download.
     WHERE rcvprn IN s_rcvprn
       AND rcvprt IN s_rcvprt
       AND mestyp IN s_mestyp
-      AND idoctp IN s_idoctp.
+      AND idoctyp IN s_idoctp.
 
   " Select message control (output determination)
   SELECT * FROM edp12
