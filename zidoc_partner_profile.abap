@@ -2,8 +2,8 @@
 *& Report ZIDOC_PARTNER_PROFILE
 *&---------------------------------------------------------------------*
 *& Upload / Download IDoc Partner Profiles (WE20) as XML.
-*& Covers outbound (EDP13) and inbound (EDP12) parameters for all
-*& partner types (KU, LI, LS, B, GP, US, etc.).
+*& Covers headers (EDPP1), outbound (EDP13), inbound (EDP21),
+*& and message control (EDP12) for all partner types.
 *&
 *& Download: Reads profiles matching selection criteria → XML file.
 *& Upload:   Reads XML file → imports profiles into target system.
@@ -21,6 +21,7 @@ TABLES: edp13.
 TYPES:
   ty_t_edpp1 TYPE STANDARD TABLE OF edpp1 WITH DEFAULT KEY,
   ty_t_edp13 TYPE STANDARD TABLE OF edp13 WITH DEFAULT KEY,
+  ty_t_edp21 TYPE STANDARD TABLE OF edp21 WITH DEFAULT KEY,
   ty_t_edp12 TYPE STANDARD TABLE OF edp12 WITH DEFAULT KEY.
 
 TYPES: BEGIN OF ty_export,
@@ -31,6 +32,7 @@ TYPES: BEGIN OF ty_export,
          expuser TYPE c LENGTH 12,
          edpp1   TYPE ty_t_edpp1,
          edp13   TYPE ty_t_edp13,
+         edp21   TYPE ty_t_edp21,
          edp12   TYPE ty_t_edp12,
        END OF ty_export.
 
@@ -171,6 +173,7 @@ FORM download.
   DATA: ls_export  TYPE ty_export,
         lt_edpp1   TYPE ty_t_edpp1,
         lt_edp13   TYPE ty_t_edp13,
+        lt_edp21   TYPE ty_t_edp21,
         lt_edp12   TYPE ty_t_edp12,
         lt_pkeys   TYPE ty_t_pkeys,
         ls_pkey    TYPE ty_pkey,
@@ -186,15 +189,22 @@ FORM download.
       AND mestyp IN s_mestyp
       AND idoctp IN s_idoctp.
 
-  " Select inbound parameters (same filters)
-  SELECT * FROM edp12
-    INTO TABLE lt_edp12
+  " Select inbound parameters
+  SELECT * FROM edp21
+    INTO TABLE lt_edp21
     WHERE rcvprn IN s_rcvprn
       AND rcvprt IN s_rcvprt
       AND mestyp IN s_mestyp
       AND idoctp IN s_idoctp.
 
-  IF lt_edp13 IS INITIAL AND lt_edp12 IS INITIAL.
+  " Select message control (output determination)
+  SELECT * FROM edp12
+    INTO TABLE lt_edp12
+    WHERE rcvprn IN s_rcvprn
+      AND rcvprt IN s_rcvprt
+      AND mestyp IN s_mestyp.
+
+  IF lt_edp13 IS INITIAL AND lt_edp21 IS INITIAL AND lt_edp12 IS INITIAL.
     MESSAGE 'No partner profiles found for the given selection' TYPE 'S' DISPLAY LIKE 'W'.
     RETURN.
   ENDIF.
@@ -213,6 +223,7 @@ FORM download.
   ls_export-expuser = sy-uname.
   ls_export-edpp1   = lt_edpp1.
   ls_export-edp13   = lt_edp13.
+  ls_export-edp21   = lt_edp21.
   ls_export-edp12   = lt_edp12.
 
   " Serialize to XML (UTF-8)
@@ -252,9 +263,14 @@ FORM download.
     ls_pkey-rcvprt = <o>-rcvprt.
     INSERT ls_pkey INTO TABLE lt_pkeys.
   ENDLOOP.
-  LOOP AT lt_edp12 ASSIGNING FIELD-SYMBOL(<i>).
+  LOOP AT lt_edp21 ASSIGNING FIELD-SYMBOL(<i>).
     ls_pkey-rcvprn = <i>-rcvprn.
     ls_pkey-rcvprt = <i>-rcvprt.
+    INSERT ls_pkey INTO TABLE lt_pkeys.
+  ENDLOOP.
+  LOOP AT lt_edp12 ASSIGNING FIELD-SYMBOL(<m>).
+    ls_pkey-rcvprn = <m>-rcvprn.
+    ls_pkey-rcvprt = <m>-rcvprt.
     INSERT ls_pkey INTO TABLE lt_pkeys.
   ENDLOOP.
 
@@ -262,31 +278,38 @@ FORM download.
   ULINE.
   WRITE: / 'Download completed successfully' COLOR COL_POSITIVE.
   ULINE.
-  WRITE: / 'System / Client:',  15 sy-sysid, '/', sy-mandt.
-  WRITE: / 'Partners:',         15 lines( lt_pkeys ).
-  WRITE: / 'Headers  (EDPP1):', 15 lines( lt_edpp1 ).
-  WRITE: / 'Outbound (EDP13):', 15 lines( lt_edp13 ).
-  WRITE: / 'Inbound  (EDP12):', 15 lines( lt_edp12 ).
+  WRITE: / 'System / Client:',    15 sy-sysid, '/', sy-mandt.
+  WRITE: / 'Partners:',           15 lines( lt_pkeys ).
+  WRITE: / 'Headers    (EDPP1):', 15 lines( lt_edpp1 ).
+  WRITE: / 'Outbound   (EDP13):', 15 lines( lt_edp13 ).
+  WRITE: / 'Inbound    (EDP21):', 15 lines( lt_edp21 ).
+  WRITE: / 'Msg Control(EDP12):', 15 lines( lt_edp12 ).
   SKIP.
   WRITE: / 'File:', p_file.
 
   " List exported partners
   SKIP.
-  WRITE: / 'Partner', 15 'Type', 20 'Outbound', 30 'Inbound'.
+  WRITE: / 'Partner', 15 'Type', 20 'Outbound', 30 'Inbound', 40 'MsgCtrl'.
   ULINE.
   DATA: lv_out_cnt TYPE i,
-        lv_in_cnt  TYPE i.
+        lv_in_cnt  TYPE i,
+        lv_mc_cnt  TYPE i.
   LOOP AT lt_pkeys INTO ls_pkey.
-    CLEAR: lv_out_cnt, lv_in_cnt.
+    CLEAR: lv_out_cnt, lv_in_cnt, lv_mc_cnt.
     LOOP AT lt_edp13 TRANSPORTING NO FIELDS
       WHERE rcvprn = ls_pkey-rcvprn AND rcvprt = ls_pkey-rcvprt.
       lv_out_cnt = lv_out_cnt + 1.
     ENDLOOP.
-    LOOP AT lt_edp12 TRANSPORTING NO FIELDS
+    LOOP AT lt_edp21 TRANSPORTING NO FIELDS
       WHERE rcvprn = ls_pkey-rcvprn AND rcvprt = ls_pkey-rcvprt.
       lv_in_cnt = lv_in_cnt + 1.
     ENDLOOP.
-    WRITE: / ls_pkey-rcvprn, 15 ls_pkey-rcvprt, 20 lv_out_cnt, 30 lv_in_cnt.
+    LOOP AT lt_edp12 TRANSPORTING NO FIELDS
+      WHERE rcvprn = ls_pkey-rcvprn AND rcvprt = ls_pkey-rcvprt.
+      lv_mc_cnt = lv_mc_cnt + 1.
+    ENDLOOP.
+    WRITE: / ls_pkey-rcvprn, 15 ls_pkey-rcvprt,
+             20 lv_out_cnt, 30 lv_in_cnt, 40 lv_mc_cnt.
   ENDLOOP.
 ENDFORM.
 
@@ -350,8 +373,11 @@ FORM upload.
   LOOP AT ls_import-edp13 ASSIGNING FIELD-SYMBOL(<o>).
     <o>-mandt = sy-mandt.
   ENDLOOP.
-  LOOP AT ls_import-edp12 ASSIGNING FIELD-SYMBOL(<i>).
+  LOOP AT ls_import-edp21 ASSIGNING FIELD-SYMBOL(<i>).
     <i>-mandt = sy-mandt.
+  ENDLOOP.
+  LOOP AT ls_import-edp12 ASSIGNING FIELD-SYMBOL(<m>).
+    <m>-mandt = sy-mandt.
   ENDLOOP.
 
   " 5. Collect unique partners
@@ -360,9 +386,14 @@ FORM upload.
     ls_pkey-rcvprt = <o>-rcvprt.
     INSERT ls_pkey INTO TABLE lt_pkeys.
   ENDLOOP.
-  LOOP AT ls_import-edp12 ASSIGNING <i>.
+  LOOP AT ls_import-edp21 ASSIGNING <i>.
     ls_pkey-rcvprn = <i>-rcvprn.
     ls_pkey-rcvprt = <i>-rcvprt.
+    INSERT ls_pkey INTO TABLE lt_pkeys.
+  ENDLOOP.
+  LOOP AT ls_import-edp12 ASSIGNING <m>.
+    ls_pkey-rcvprn = <m>-rcvprn.
+    ls_pkey-rcvprt = <m>-rcvprt.
     INSERT ls_pkey INTO TABLE lt_pkeys.
   ENDLOOP.
 
@@ -373,48 +404,57 @@ FORM upload.
   WRITE: / 'Source system / client:', ls_import-sysid, '/', ls_import-client.
   WRITE: / 'Exported:',              ls_import-expdate, ls_import-exptime,
            'by', ls_import-expuser.
-  WRITE: / 'Partners:',         15 lines( lt_pkeys ).
-  WRITE: / 'Headers  (EDPP1):', 15 lines( ls_import-edpp1 ).
-  WRITE: / 'Outbound (EDP13):', 15 lines( ls_import-edp13 ).
-  WRITE: / 'Inbound  (EDP12):', 15 lines( ls_import-edp12 ).
+  WRITE: / 'Partners:',           15 lines( lt_pkeys ).
+  WRITE: / 'Headers    (EDPP1):', 15 lines( ls_import-edpp1 ).
+  WRITE: / 'Outbound   (EDP13):', 15 lines( ls_import-edp13 ).
+  WRITE: / 'Inbound    (EDP21):', 15 lines( ls_import-edp21 ).
+  WRITE: / 'Msg Control(EDP12):', 15 lines( ls_import-edp12 ).
   SKIP.
 
   " 7. Per-partner analysis
-  WRITE: / 'Partner', 15 'Type', 20 'Import Out', 32 'Import In',
-           44 'Existing Out', 58 'Existing In'.
+  WRITE: / 'Partner', 15 'Type', 20 'Imp Out', 30 'Imp In', 40 'Imp MC',
+           50 'Exist Out', 60 'Exist In', 70 'Exist MC'.
   ULINE.
   LOOP AT lt_pkeys INTO ls_pkey.
     CLEAR: lv_out_cnt, lv_in_cnt.
 
-    " Count entries to import for this partner
     DATA: lv_imp_out TYPE i,
-          lv_imp_in  TYPE i.
-    CLEAR: lv_imp_out, lv_imp_in.
+          lv_imp_in  TYPE i,
+          lv_imp_mc  TYPE i,
+          lv_mc_cnt  TYPE i.
+    CLEAR: lv_imp_out, lv_imp_in, lv_imp_mc.
     LOOP AT ls_import-edp13 TRANSPORTING NO FIELDS
       WHERE rcvprn = ls_pkey-rcvprn AND rcvprt = ls_pkey-rcvprt.
       lv_imp_out = lv_imp_out + 1.
     ENDLOOP.
-    LOOP AT ls_import-edp12 TRANSPORTING NO FIELDS
+    LOOP AT ls_import-edp21 TRANSPORTING NO FIELDS
       WHERE rcvprn = ls_pkey-rcvprn AND rcvprt = ls_pkey-rcvprt.
       lv_imp_in = lv_imp_in + 1.
+    ENDLOOP.
+    LOOP AT ls_import-edp12 TRANSPORTING NO FIELDS
+      WHERE rcvprn = ls_pkey-rcvprn AND rcvprt = ls_pkey-rcvprt.
+      lv_imp_mc = lv_imp_mc + 1.
     ENDLOOP.
 
     " Count existing entries in target system
     SELECT COUNT(*) FROM edp13
       WHERE rcvprn = ls_pkey-rcvprn AND rcvprt = ls_pkey-rcvprt.
     lv_out_cnt = sy-dbcnt.
-    SELECT COUNT(*) FROM edp12
+    SELECT COUNT(*) FROM edp21
       WHERE rcvprn = ls_pkey-rcvprn AND rcvprt = ls_pkey-rcvprt.
     lv_in_cnt = sy-dbcnt.
+    SELECT COUNT(*) FROM edp12
+      WHERE rcvprn = ls_pkey-rcvprn AND rcvprt = ls_pkey-rcvprt.
+    lv_mc_cnt = sy-dbcnt.
 
     WRITE: / ls_pkey-rcvprn, 15 ls_pkey-rcvprt,
-             20 lv_imp_out, 32 lv_imp_in,
-             44 lv_out_cnt, 58 lv_in_cnt.
+             20 lv_imp_out, 30 lv_imp_in, 40 lv_imp_mc,
+             50 lv_out_cnt, 60 lv_in_cnt, 70 lv_mc_cnt.
 
-    IF lv_out_cnt > 0 OR lv_in_cnt > 0.
-      WRITE: 70 '* exists' COLOR COL_TOTAL.
+    IF lv_out_cnt > 0 OR lv_in_cnt > 0 OR lv_mc_cnt > 0.
+      WRITE: 80 '* exists' COLOR COL_TOTAL.
     ELSE.
-      WRITE: 70 '  new' COLOR COL_POSITIVE.
+      WRITE: 80 '  new' COLOR COL_POSITIVE.
     ENDIF.
   ENDLOOP.
   SKIP.
@@ -433,6 +473,8 @@ FORM upload.
         WHERE rcvprn = ls_pkey-rcvprn AND rcvprt = ls_pkey-rcvprt.
       DELETE FROM edp13
         WHERE rcvprn = ls_pkey-rcvprn AND rcvprt = ls_pkey-rcvprt.
+      DELETE FROM edp21
+        WHERE rcvprn = ls_pkey-rcvprn AND rcvprt = ls_pkey-rcvprt.
       DELETE FROM edp12
         WHERE rcvprn = ls_pkey-rcvprn AND rcvprt = ls_pkey-rcvprt.
     ENDLOOP.
@@ -443,29 +485,39 @@ FORM upload.
   IF ls_import-edpp1 IS NOT INITIAL.
     MODIFY edpp1 FROM TABLE ls_import-edpp1.
     IF sy-subrc = 0.
-      WRITE: / 'Headers (EDPP1) imported:' COLOR COL_POSITIVE, lines( ls_import-edpp1 ), 'entries.'.
+      WRITE: / 'Headers     (EDPP1) imported:' COLOR COL_POSITIVE, lines( ls_import-edpp1 ), 'entries.'.
     ELSE.
       WRITE: / 'Error importing partner profile headers.' COLOR COL_NEGATIVE.
     ENDIF.
   ENDIF.
 
-  " 12. Import outbound parameters
+  " 11. Import outbound parameters
   IF ls_import-edp13 IS NOT INITIAL.
     MODIFY edp13 FROM TABLE ls_import-edp13.
     IF sy-subrc = 0.
-      WRITE: / 'Outbound (EDP13) imported:' COLOR COL_POSITIVE, lines( ls_import-edp13 ), 'entries.'.
+      WRITE: / 'Outbound    (EDP13) imported:' COLOR COL_POSITIVE, lines( ls_import-edp13 ), 'entries.'.
     ELSE.
       WRITE: / 'Error importing outbound parameters.' COLOR COL_NEGATIVE.
     ENDIF.
   ENDIF.
 
-  " 13. Import inbound parameters
+  " 12. Import inbound parameters
+  IF ls_import-edp21 IS NOT INITIAL.
+    MODIFY edp21 FROM TABLE ls_import-edp21.
+    IF sy-subrc = 0.
+      WRITE: / 'Inbound     (EDP21) imported:' COLOR COL_POSITIVE, lines( ls_import-edp21 ), 'entries.'.
+    ELSE.
+      WRITE: / 'Error importing inbound parameters.' COLOR COL_NEGATIVE.
+    ENDIF.
+  ENDIF.
+
+  " 13. Import message control
   IF ls_import-edp12 IS NOT INITIAL.
     MODIFY edp12 FROM TABLE ls_import-edp12.
     IF sy-subrc = 0.
-      WRITE: / 'Inbound (EDP12) imported:' COLOR COL_POSITIVE, lines( ls_import-edp12 ), 'entries.'.
+      WRITE: / 'Msg Control (EDP12) imported:' COLOR COL_POSITIVE, lines( ls_import-edp12 ), 'entries.'.
     ELSE.
-      WRITE: / 'Error importing inbound parameters.' COLOR COL_NEGATIVE.
+      WRITE: / 'Error importing message control entries.' COLOR COL_NEGATIVE.
     ENDIF.
   ENDIF.
 
