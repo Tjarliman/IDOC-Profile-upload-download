@@ -45,21 +45,21 @@ TYPES: BEGIN OF ty_pkey,
 *----------------------------------------------------------------------*
 * Screen Title Variables
 *----------------------------------------------------------------------*
-DATA: gv_t_mode   TYPE c LENGTH 40,
-      gv_t_filter TYPE c LENGTH 40,
-      gv_t_file   TYPE c LENGTH 40,
-      gv_t_opt    TYPE c LENGTH 40.
+DATA: t_mode   TYPE c LENGTH 40,
+      t_filter TYPE c LENGTH 40,
+      t_file   TYPE c LENGTH 40,
+      t_opt    TYPE c LENGTH 40.
 
 *----------------------------------------------------------------------*
 * Selection Screen
 *----------------------------------------------------------------------*
-SELECTION-SCREEN BEGIN OF BLOCK b0 WITH FRAME TITLE gv_t_mode.
+SELECTION-SCREEN BEGIN OF BLOCK b0 WITH FRAME TITLE t_mode.
   PARAMETERS:
     p_down RADIOBUTTON GROUP grp1 DEFAULT 'X' USER-COMMAND uc01,
     p_up   RADIOBUTTON GROUP grp1.
 SELECTION-SCREEN END OF BLOCK b0.
 
-SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE gv_t_filter.
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE t_filter.
   SELECT-OPTIONS:
     s_rcvprn FOR edp13-rcvprn MODIF ID dwn,
     s_rcvprt FOR edp13-rcvprt MODIF ID dwn,
@@ -67,11 +67,11 @@ SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE gv_t_filter.
     s_idoctp FOR edp13-idoctp MODIF ID dwn.
 SELECTION-SCREEN END OF BLOCK b1.
 
-SELECTION-SCREEN BEGIN OF BLOCK b2 WITH FRAME TITLE gv_t_file.
+SELECTION-SCREEN BEGIN OF BLOCK b2 WITH FRAME TITLE t_file.
   PARAMETERS: p_file TYPE string LOWER CASE OBLIGATORY.
 SELECTION-SCREEN END OF BLOCK b2.
 
-SELECTION-SCREEN BEGIN OF BLOCK b3 WITH FRAME TITLE gv_t_opt.
+SELECTION-SCREEN BEGIN OF BLOCK b3 WITH FRAME TITLE t_opt.
   PARAMETERS:
     p_test AS CHECKBOX DEFAULT 'X' MODIF ID upl,
     p_repl AS CHECKBOX DEFAULT ' ' MODIF ID upl.
@@ -81,10 +81,10 @@ SELECTION-SCREEN END OF BLOCK b3.
 * Initialization
 *----------------------------------------------------------------------*
 INITIALIZATION.
-  gv_t_mode   = 'Mode'.
-  gv_t_filter = 'Download Filters'.
-  gv_t_file   = 'File'.
-  gv_t_opt    = 'Upload Options'.
+  t_mode   = 'Mode'.
+  t_filter = 'Download Filters'.
+  t_file   = 'File'.
+  t_opt    = 'Upload Options'.
 
 *----------------------------------------------------------------------*
 * Toggle field visibility based on mode
